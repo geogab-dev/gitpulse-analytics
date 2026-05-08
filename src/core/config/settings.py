@@ -1,22 +1,45 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+COMMON_CONFIG: SettingsConfigDict = SettingsConfigDict(
+    env_file=".env",
+    env_file_encoding="utf-8",
+    extra="ignore",
+)
+
+
+class LoggingSettings(BaseSettings):
+    # logging settings
+    model_config: SettingsConfigDict = SettingsConfigDict(**COMMON_CONFIG, env_prefix="LOG_")
+
+    level: str = "INFO"
+    use_colors: bool = True
+
+
+class MinioSettings(BaseSettings):
+    # minio settings
+    model_config: SettingsConfigDict = SettingsConfigDict(**COMMON_CONFIG, env_prefix="MINIO_")
+
+    root_user: str
+    root_password: str
+    endpoint: str
+
+    bucket_bronze: str = "bronze"
+    bucket_silver: str = "silver"
+    bucket_gold: str = "gold"
+
+
+class PrefectSettings(BaseSettings):
+    # prefect settings
+    model_config: SettingsConfigDict = SettingsConfigDict(**COMMON_CONFIG, env_prefix="PREFECT_")
+
+    server_ui_api_url: str
 
 
 class Settings(BaseSettings):
-    # minio settings
-    minio_root_user: str
-    minio_root_password: str
-    minio_endpoint: str
-    minio_bucket_bronze: str = "bronze"
-    minio_bucket_silver: str = "silver"
-    minio_bucket_gold: str = "gold"
-
-    # prefect settings
-    prefect_server_ui_api_url: str
-
-    # load environment variables from .env file
-    model_config: SettingsConfigDict = SettingsConfigDict(
-        env_file=(".env"), env_file_encoding="utf-8", extra="ignore"
-    )
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
+    minio: MinioSettings = Field(default_factory=MinioSettings)
+    prefect: PrefectSettings = Field(default_factory=PrefectSettings)
 
 
 settings = Settings()
