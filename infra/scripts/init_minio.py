@@ -1,18 +1,18 @@
-# infra/init_minio_buckets.py
-from logging import Logger
+# infra/scripts/init_minio.py
+from logging import Logger, LoggerAdapter
 
 import s3fs
 
 from core.config import settings
-from core.utils.logger import get_logger
+from core.helpers.logger import get_logger
 
 
-def create_buckets():
+def init_minio_buckets() -> None:
     """
     Set up MinIO buckets for bronze, silver, and gold layers.
     This function checks if the buckets already exist and creates them if they don't.
     """
-    logger: Logger = get_logger(__name__)
+    logger: Logger | LoggerAdapter[Logger] = get_logger(__name__)
     logger.info("🧺  Starting MinIO bucket setup...")
 
     # connect to MinIO using s3fs with the provided credentials and endpoint
@@ -41,4 +41,4 @@ def create_buckets():
 
 
 if __name__ == "__main__":
-    create_buckets()
+    init_minio_buckets()

@@ -11,33 +11,72 @@ requires-python = ">=3.12"
 dependencies = [
     "colorlog>=6.10.1",
     "prefect>=3.6.29",
-    "ruff>=0.15.12",
     "s3fs>=2026.4.0",
 ]
 
-[tool.hatch.metadata]
-allow-direct-references = true # allow direct references to local packages for development
+[dependency-groups]
+dev = [
+    "pyrefly>=0.64.1",
+    "ruff>=0.15.12",
+]
 
+[tool.uv]
+managed = true
+
+# allow direct references to local packages for development
+[tool.hatch.metadata]
+allow-direct-references = true
+
+# specify the source directory for our package
 [tool.hatch.build.targets.wheel]
 packages = ["src/core"]
 
+# ruff configurations
 [tool.ruff]
 line-length = 100
 target-version = "py312"
 
+# linting rules
 [tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
     "F",   # pyflakes
     "I",   # isort
     "UP",  # pyupgrade
     "B",   # flake8-bugbear
+    "SIM", # flake8-simplify (sugere código mais simples)
+    "PT",  # flake8-pytest-style (melhor prática em testes)
     "PL",  # pylint
+    "C90", # mccabe (code complexity)
 ]
 ignore = [
-    "E501", # too long lines
-    "PLR0913", # too many arguments in function definition
+    "E501",     # too long lines
+    "PLR0913",  # too many arguments in function definition
 ]
+fixable = ["ALL"]
 
+# help isort recognize our local modules for better import sorting
 [tool.ruff.lint.isort]
-known-first-party = ["core"] # help isort recognize our local modules for better import sorting
+known-first-party = ["src"]
+
+# style settings for code formatting
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# type checking settings for pyrefly
+[tool.pyrefly]
+project-includes = [
+    "src/**/*.py",
+    "tests/**/*.py",
+]
+project-excludes = [
+    ".venv/**",
+    "build/**",
+    "dist/**",
+]
+search-path = ["src"]
+python-version = "3.12"

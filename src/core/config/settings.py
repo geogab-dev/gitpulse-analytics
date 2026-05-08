@@ -1,7 +1,9 @@
+from typing import ClassVar
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-COMMON_CONFIG: SettingsConfigDict = SettingsConfigDict(
+COMMON_CONFIG: dict = dict(
     env_file=".env",
     env_file_encoding="utf-8",
     extra="ignore",
@@ -10,7 +12,9 @@ COMMON_CONFIG: SettingsConfigDict = SettingsConfigDict(
 
 class LoggingSettings(BaseSettings):
     # logging settings
-    model_config: SettingsConfigDict = SettingsConfigDict(**COMMON_CONFIG, env_prefix="LOG_")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        **COMMON_CONFIG, env_prefix="LOG_"
+    )
 
     level: str = "INFO"
     use_colors: bool = True
@@ -18,7 +22,9 @@ class LoggingSettings(BaseSettings):
 
 class MinioSettings(BaseSettings):
     # minio settings
-    model_config: SettingsConfigDict = SettingsConfigDict(**COMMON_CONFIG, env_prefix="MINIO_")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        **COMMON_CONFIG, env_prefix="MINIO_"
+    )
 
     root_user: str
     root_password: str
@@ -31,7 +37,9 @@ class MinioSettings(BaseSettings):
 
 class PrefectSettings(BaseSettings):
     # prefect settings
-    model_config: SettingsConfigDict = SettingsConfigDict(**COMMON_CONFIG, env_prefix="PREFECT_")
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        **COMMON_CONFIG, env_prefix="PREFECT_"
+    )
 
     server_ui_api_url: str
 

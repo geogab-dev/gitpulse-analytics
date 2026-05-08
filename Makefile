@@ -1,12 +1,12 @@
 .PHONY: \
 	help up down restart logs ps clean reset \
-	format lint
+	format lint typecheck
 
 help:
 	@echo
 	@echo "Gitpulse Analytics Commands:"
 	@echo ""
-	@echo "[Infra]"
+	@echo "[INFRASTRUCTURE]"
 	@echo "   make up: Start the infrastructure using Docker Compose and set up MinIO buckets"
 	@echo "   make down: Stop the infrastructure"
 	@echo "   make restart: Restart the infrastructure"
@@ -14,14 +14,15 @@ help:
 	@echo "   make ps: List the running containers for the infrastructure"
 	@echo "   make reset: Reset the infrastructure. WARNING: This will remove all data and volumes!"
 	@echo ""
-	@echo "[Development]"
+	@echo "[DEVELOPMENT]"
 	@echo "   make format: Format the code using ruff"
 	@echo "   make lint: Check the code for issues using ruff"
+	@echo "   make typecheck: Check the code for type issues using pyrefly"
 	@echo
 
 up:
 	docker compose up -d --wait
-	uv run python infra/init_minio_buckets.py
+	uv run python infra/scripts/init_minio.py
 
 down:
 	docker compose down
@@ -48,3 +49,6 @@ format:
 
 lint:
 	uv run ruff check .
+
+typecheck:
+	uv run pyrefly check .

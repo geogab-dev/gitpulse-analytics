@@ -1,6 +1,6 @@
 import logging
 import sys
-from logging import Logger
+from logging import Logger, LoggerAdapter
 
 import colorlog
 from prefect.exceptions import MissingContextError
@@ -19,7 +19,7 @@ def _configure_logger(logger: Logger) -> None:
     handler = colorlog.StreamHandler(sys.stdout)
 
     if settings.logging.use_colors:
-        formatter: colorlog.ColoredFormatter = colorlog.ColoredFormatter(
+        formatter = colorlog.ColoredFormatter(
             fmt="%(asctime)s.%(msecs)03d | %(log_color)s%(levelname)-7s%(reset)s | %(message)s",
             datefmt="%H:%M:%S",
             log_colors={
@@ -41,7 +41,7 @@ def _configure_logger(logger: Logger) -> None:
     logger.propagate = False
 
 
-def get_logger(name: str | None = None) -> logging.Logger:
+def get_logger(name: str | None = None) -> Logger | LoggerAdapter[Logger]:
     """
     Get a logger that works both inside and outside of Prefect flows.
 
