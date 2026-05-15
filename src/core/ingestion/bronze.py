@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
+import pandera.errors
 import polars as pl
 from polars import LazyFrame
 
@@ -78,20 +79,19 @@ def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
             ),
         )
 
-        # data contract ensures required fields (id, type, created_at) are non-null
-        try:
-            BronzeEventsContract.validate(check_obj=lazy, lazy=True)
-        except Exception as ex:
-            logger.error(f"contract validation failed for {url}: {ex}")
-            return IngestResult.FAILED
-
-        lazy.sink_parquet(path=s3_path, compression="zstd", storage_options=S3_STORAGE_OPTIONS)
+        # validate(lazy=True) returns a new LazyFrame with validation expressions
+        # using it for sink_parquet forces the validation to run during execution
+        validated: LazyFrame = BronzeEventsContract.validate(check_obj=lazy, lazy=True)
+        validated.sink_parquet(path=s3_path, compression="zstd", storage_options=S3_STORAGE_OPTIONS)
         return IngestResult.SUCCESS
+    except pandera.errors.SchemaError as ex:
+        # data contract violation: data doesn't meet quality gates
+        logger.error(f"data contract validation failed for {url}: {ex}")
+        return IngestResult.FAILED
     except OSError as ex:
         # GH Archive may return 404 if the file for that hour hasn't been published yet.
         # This is normal, hours near "now" are often delayed so we skip, not fail.
         if "404" in str(ex) or "Not Found" in str(ex):
-            logger.warning(f"file not yet available on GH Archive: {url}")
             return IngestResult.SKIPPED
         logger.error(f"failed to ingest {url}: {ex}")
         return IngestResult.FAILED
