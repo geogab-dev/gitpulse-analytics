@@ -10,12 +10,18 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "colorlog>=6.10.1",
+    "pandera[polars]>=0.31.1",
+    "polars>=1.40.1",
     "prefect>=3.6.29",
+    "rich>=15.0.0",
     "s3fs>=2026.4.0",
 ]
 
 [dependency-groups]
 dev = [
+    "itables>=2.7.3",
+    "pandas>=3.0.3",
+    "pyarrow>=24.0.0",
     "pyrefly>=0.64.1",
     "ruff>=0.15.12",
 ]
