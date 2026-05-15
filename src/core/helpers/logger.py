@@ -8,6 +8,45 @@ from prefect.logging import get_run_logger
 
 from core.config.settings import settings
 
+# ANSI helpers for coloring log messages (works both inside and outside Prefect)
+_RESET = "\033[0m"
+_ANSI: dict[str, str] = {
+    "red": "\033[91m",
+    "green": "\033[92m",
+    "yellow": "\033[93m",
+    "blue": "\033[94m",
+    "magenta": "\033[95m",
+    "cyan": "\033[96m",
+}
+
+
+def _color(name: str, text: str | int) -> str:
+    return f"{_ANSI[name]}{text}{_RESET}"
+
+
+def red(text: str | int) -> str:
+    return _color("red", text)
+
+
+def green(text: str | int) -> str:
+    return _color("green", text)
+
+
+def yellow(text: str | int) -> str:
+    return _color("yellow", text)
+
+
+def blue(text: str | int) -> str:
+    return _color("blue", text)
+
+
+def magenta(text: str | int) -> str:
+    return _color("magenta", text)
+
+
+def cyan(text: str | int) -> str:
+    return _color("cyan", text)
+
 
 def _configure_logger(logger: Logger) -> None:
     """Configure a logger with colorized output and proper formatting."""
