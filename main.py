@@ -1,20 +1,29 @@
-from multiprocessing import cpu_count
+"""
+Entrypoint: serves all Prefect flows as deployments.
 
-from prefect import flow, task
+Usage:
+    uv run main.py                    # serve all flows
+    uv run main.py bronze             # serve only the bronze flow
+"""
 
-from core.ingestion import run_ingestion
+import sys
+
+from pipelines.bronze_flow import bronze_ingestion_flow
 
 
-@task(log_prints=True)
-def prefect_task(days: int, max_workers: int) -> None:
-    run_ingestion(days=days, max_workers=max_workers)
+def serve_all() -> None:
+    """Serve all available flows for deployment."""
+    bronze_ingestion_flow.serve(name="bronze-ingestion-deployment")
 
 
-@flow(name="prefect-test-flow", log_prints=True)
-def prefect_main_flow(days: int, max_workers: int) -> None:
-    prefect_task(days=days, max_workers=max_workers)
+def serve_bronze() -> None:
+    """Serve only the bronze ingestion flow."""
+    bronze_ingestion_flow.serve(name="bronze-ingestion-deployment")
 
 
 if __name__ == "__main__":
-    # serve the flow for deployment
-    prefect_main_flow(days=1, max_workers=cpu_count())
+    arg: str = sys.argv[1] if len(sys.argv) > 1 else ""
+
+    match arg:
+        case "bronze":
+            serve_bronze()
