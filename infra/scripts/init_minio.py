@@ -1,10 +1,9 @@
 # infra/scripts/init_minio.py
 from logging import Logger, LoggerAdapter
 
-import s3fs
-
 from core.config import settings
 from core.helpers.logger import get_logger
+from core.helpers.s3 import get_s3_fs
 
 
 def init_minio_buckets() -> None:
@@ -16,11 +15,7 @@ def init_minio_buckets() -> None:
     logger.info("🧺  Starting MinIO bucket setup...")
 
     # connect to MinIO using s3fs with the provided credentials and endpoint
-    fs = s3fs.S3FileSystem(
-        key=settings.minio.root_user,
-        secret=settings.minio.root_password,
-        endpoint_url=settings.minio.endpoint,
-    )
+    fs = get_s3_fs()
 
     # get the bucket names from settings
     buckets: list[str] = [
