@@ -8,3 +8,12 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Local notebooks (data exploration and visualization only)
+notebooks/
+
+# Copilot instructions (local-only setup)
+.github/*-instructions.md
+
+# Vscode local settings
+.vscode
