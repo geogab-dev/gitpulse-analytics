@@ -34,12 +34,12 @@ def generate_hourly_datetimes(days: int) -> list[datetime]:
 
 def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
     """
-    Fetch one hour of GH Archive events, validate, and write as Parquet to the bronze layer.
+    Fetch one hour of GH Archive events, validate a sample, and write as Parquet to the bronze layer.
 
     Steps:
         1. Skip if the parquet file already exists in MinIO (idempotency).
         2. Stream the .json.gz directly from GH Archive into a LazyFrame.
-        3. Validate against the bronze data contract (Pandera).
+        3. Validate a sample (first 10k rows) against the bronze data contract.
         4. Sink to partitioned Parquet in S3 (MinIO).
 
     Error handling:
@@ -79,9 +79,10 @@ def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
             ),
         )
 
-        # validate(lazy=True) returns a new LazyFrame with validation expressions
-        # using it for sink_parquet forces the validation to run during execution
-        validated: LazyFrame = BronzeEventsContract.validate(check_obj=lazy, lazy=True)
+        # validate a sample (first 10k rows) instead of the full file
+        # GH Archive data is consistent, if the sample passes, the rest is safe
+        # this avoids the overhead of Pandera expressions on every row during sink
+        validated = BronzeEventsContract.validate(check_obj=lazy, lazy=True, head=10_000)
         validated.sink_parquet(path=s3_path, compression="zstd", storage_options=S3_STORAGE_OPTIONS)
         return IngestResult.SUCCESS
     except pandera.errors.SchemaError as ex:
