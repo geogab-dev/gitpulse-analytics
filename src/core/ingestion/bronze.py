@@ -1,12 +1,12 @@
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
-import pandera.errors
 import polars as pl
 from polars import LazyFrame
+from s3fs import S3FileSystem
 
 from core.config import settings
-from core.contracts.bronze import BRONZE_EVENTS_SCHEMA, BronzeEventsContract
+from core.contracts.bronze import BRONZE_EVENTS_SCHEMA
 from core.helpers.logger import get_logger
 from core.helpers.s3 import S3_STORAGE_OPTIONS, get_s3_fs
 
@@ -64,7 +64,7 @@ def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
 
     # skip if data is already in the lake (idempotent runs)
     if not overwrite:
-        fs = get_s3_fs()
+        fs: S3FileSystem = get_s3_fs()
         if fs.exists(s3_path):
             return IngestResult.SKIPPED
 
@@ -79,16 +79,11 @@ def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
             ),
         )
 
-        # validate a sample (first 10k rows) instead of the full file
-        # GH Archive data is consistent, if the sample passes, the rest is safe
-        # this avoids the overhead of Pandera expressions on every row during sink
-        validated = BronzeEventsContract.validate(check_obj=lazy, lazy=True, head=10_000)
-        validated.sink_parquet(path=s3_path, compression="zstd", storage_options=S3_STORAGE_OPTIONS)
+        # opt to not validate the data here since GH Archive is a well-known consistent source
+        # we want to avoid the pandera validation overhead and improve ingestion speed
+        # future validations will occur in the silver transformation layer
+        lazy.sink_parquet(path=s3_path, compression="zstd", storage_options=S3_STORAGE_OPTIONS)
         return IngestResult.SUCCESS
-    except pandera.errors.SchemaError as ex:
-        # data contract violation: data doesn't meet quality gates
-        logger.error(f"data contract validation failed for {url}: {ex}")
-        return IngestResult.FAILED
     except OSError as ex:
         # GH Archive may return 404 if the file for that hour hasn't been published yet.
         # This is normal, hours near "now" are often delayed so we skip, not fail.
