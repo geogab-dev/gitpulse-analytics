@@ -26,24 +26,24 @@ help:
 	@echo
 
 up:
-	docker compose up -d --wait
+	docker compose --env-file .env.example up -d --wait
 	uv run python infra/scripts/init_minio.py
 
 down:
-	docker compose down
+	docker compose --env-file .env.example down
 
 restart:
-	docker compose down
-	docker compose up -d
+	docker compose --env-file .env.example down
+	docker compose --env-file .env.example up -d
 
 logs:
-	docker compose logs -f
+	docker compose --env-file .env.example logs -f
 
 ps:
-	docker compose ps
+	docker compose --env-file .env.example ps
 
 reset:
-	docker compose down -v --remove-orphans
+	docker compose --env-file .env.example down -v --remove-orphans
 	docker system prune -f
 
 install:
