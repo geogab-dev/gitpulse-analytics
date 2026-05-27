@@ -73,10 +73,13 @@ def run_ingestion(days: int, max_workers: int) -> None:
             except Exception as exc:
                 # catch unexpected exceptions so a single worker failure
                 # doesn't crash the entire ingestion loop
-                logger.error(f"worker failed: {exc}")
+                logger.error("worker failed: %s", exc)
                 failed += 1
 
     logger.info(
-        f"{green(succeeded)} ingested • {yellow(skipped)} skipped (already existed or not yet available) • {red(failed)} failed"
+        "%s ingested • %s skipped (already ingested or not yet available) • %s failed",
+        green(succeeded),
+        yellow(skipped),
+        red(failed),
     )
     logger.info("Ingestion completed, check at http://localhost:9001/browser/bronze/")

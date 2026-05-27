@@ -10,8 +10,6 @@ from core.contracts.bronze import BRONZE_EVENTS_SCHEMA
 from core.helpers.logger import get_logger
 from core.helpers.s3 import S3_STORAGE_OPTIONS, get_s3_fs
 
-logger = get_logger(__name__)
-
 
 class IngestResult(StrEnum):
     SUCCESS = "success"
@@ -34,24 +32,23 @@ def generate_hourly_datetimes(days: int) -> list[datetime]:
 
 def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
     """
-    Fetch one hour of GH Archive events, validate a sample, and write as Parquet to the bronze layer.
+    Fetch one hour of GH Archive events and write as Parquet to the bronze layer.
 
     Steps:
         1. Skip if the parquet file already exists in MinIO (idempotency).
         2. Stream the .json.gz directly from GH Archive into a LazyFrame.
-        3. Validate a sample (first 10k rows) against the bronze data contract.
-        4. Sink to partitioned Parquet in S3 (MinIO).
+        3. Sink to partitioned Parquet in S3 (MinIO).
 
     Error handling:
         - 404 from GH Archive -> the hour hasn't been published yet -> SKIPPED (no retry).
-        - Contract validation failure -> FAILED (data quality gate).
         - Any other OSError/Exception -> FAILED (logged for investigation).
 
     Returns:
         IngestResult.SUCCESS — data ingested and written.
-        IngestResult.SKIPPED — already in MinIO, or file not yet on GH Archive.
-        IngestResult.FAILED  — validation or I/O error.
+        IngestResult.SKIPPED — already in MinIO or not yet on GH Archive.
+        IngestResult.FAILED  — I/O error during download or write.
     """
+    logger = get_logger(__name__)
 
     # build URL from datetime components
     url: str = f"https://data.gharchive.org/{dt.year}-{dt.month:02d}-{dt.day:02d}-{dt.hour}.json.gz"
@@ -89,8 +86,8 @@ def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
         # This is normal, hours near "now" are often delayed so we skip, not fail.
         if "404" in str(ex) or "Not Found" in str(ex):
             return IngestResult.SKIPPED
-        logger.error(f"failed to ingest {url}: {ex}")
+        logger.error("failed to ingest %s: %s", url, ex)
         return IngestResult.FAILED
     except Exception as ex:
-        logger.error(f"failed to ingest {url}: {ex}")
+        logger.error("failed to ingest %s: %s", url, ex)
         return IngestResult.FAILED
