@@ -4,7 +4,7 @@ from logging import Logger, LoggerAdapter
 
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeElapsedColumn
 
-from core.helpers import get_logger, green, magenta, red, yellow
+from core.helpers.logger import get_logger, green, magenta, red, yellow
 from core.ingestion.bronze import IngestResult, generate_hourly_datetimes, ingest_hour
 
 
