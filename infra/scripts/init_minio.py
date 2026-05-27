@@ -1,6 +1,8 @@
 # infra/scripts/init_minio.py
 from logging import Logger, LoggerAdapter
 
+from s3fs import S3FileSystem
+
 from core.config import settings
 from core.helpers.logger import get_logger
 from core.helpers.s3 import get_s3_fs
@@ -9,30 +11,36 @@ from core.helpers.s3 import get_s3_fs
 def init_minio_buckets() -> None:
     """
     Set up MinIO buckets for bronze, silver, and gold layers.
-    This function checks if the buckets already exist and creates them if they don't.
     """
     logger: Logger | LoggerAdapter[Logger] = get_logger(__name__)
-    logger.info("🧺  Starting MinIO bucket setup...")
 
-    # connect to MinIO using s3fs with the provided credentials and endpoint
-    fs = get_s3_fs()
+    try:
+        fs: S3FileSystem = get_s3_fs()
+        # probe connectivity by listing the root
+        fs.ls("/")
+    except Exception:
+        logger.error(
+            "cannot connect to MinIO at %s — is Docker Compose running?",
+            settings.minio.endpoint,
+        )
+        return
 
-    # get the bucket names from settings
     buckets: list[str] = [
         settings.minio.bucket_bronze,
         settings.minio.bucket_silver,
         settings.minio.bucket_gold,
     ]
 
-    # create buckets if they don't exist
+    logger.info("Starting MinIO bucket setup...")
+
     for bucket in buckets:
         if not fs.exists(bucket):
             fs.mkdir(bucket)
-            logger.info(f"✔  Bucket '{bucket}' created successfully")
+            logger.info("Bucket '%s' created successfully", bucket)
         else:
-            logger.warning(f"❌  Bucket '{bucket}' already exists")
+            logger.warning("Bucket '%s' already exists", bucket)
 
-    logger.info("🚀  Infrastructure initialized, ready to process data!")
+    logger.info("Infrastructure initialized, ready to process data!")
 
 
 if __name__ == "__main__":
