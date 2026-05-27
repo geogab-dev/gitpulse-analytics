@@ -11,8 +11,6 @@ from polars import DataFrame
 from core.helpers.logger import cyan, get_logger, magenta
 from core.helpers.s3 import S3_STORAGE_OPTIONS
 
-logger = get_logger(__name__)
-
 
 def upsert_delta(
     df: DataFrame,
@@ -32,6 +30,8 @@ def upsert_delta(
     Columns listed in *insert_only_columns* (e.g. `first_seen_at`) are set
     only on INSERT. On UPDATE the target (original) value is preserved.
     """
+    logger = get_logger(__name__)
+
     insert_only: set[str] = set(insert_only_columns or [])
 
     try:
@@ -45,7 +45,7 @@ def upsert_delta(
             partition_by=partition_by or [],
         )
 
-        logger.info(f"created {cyan(len(df))} rows into {magenta(target)} (new table)")
+        logger.info("created %s rows into %s (new table)", magenta(len(df)), cyan(target))
         return
 
     # build update mapping: source columns overwrite target, insert-only preserved
@@ -69,7 +69,7 @@ def upsert_delta(
         .execute()
     )
 
-    logger.info(f"merged {cyan(len(df))} rows into {magenta(target)}")
+    logger.info("merged %s rows into %s", magenta(len(df)), cyan(target))
 
 
 def append_delta(
@@ -83,6 +83,8 @@ def append_delta(
     Designed for immutable fact tables (e.g. GitHub events). Uses
     `write_deltalake(mode="append")` no merge, no predicate.
     """
+    logger = get_logger(__name__)
+
     write_deltalake(
         target,
         df.to_arrow(),
@@ -91,7 +93,7 @@ def append_delta(
         partition_by=partition_by or [],
     )
 
-    logger.info(f"appended {cyan(len(df))} rows into {magenta(target)}")
+    logger.info("appended %s rows into %s", magenta(len(df)), cyan(target))
 
 
 __all__: list[str] = ["upsert_delta", "append_delta"]
