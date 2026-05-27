@@ -1,8 +1,9 @@
 import pandera.polars as pa
-import polars as pl
 from pandera.engines.polars_engine import DateTime
 
-# known github event types (validated against the API payload)
+# event types we track, low-value types excluded:
+# (GollumEvent, MemberEvent, DiscussionEvent, PublicEvent)
+# no analytical value for our use case
 KNOWN_EVENT_TYPES: list[str] = [
     "PushEvent",
     "PullRequestEvent",
@@ -16,12 +17,11 @@ KNOWN_EVENT_TYPES: list[str] = [
     "ForkEvent",
     "ReleaseEvent",
     "CommitCommentEvent",
-    # event types excluded (low-value for our use case):
-    # "GollumEvent", "MemberEvent", "DiscussionEvent", "PublicEvent",
 ]
 
 
-# known github event actions (validated against the API payload)
+# actions we extract from event payloads
+# some are synthetic: (pushed, created, deleted)
 KNOWN_ACTIONS: list[str] = [
     "assigned",
     "closed",
@@ -36,7 +36,6 @@ KNOWN_ACTIONS: list[str] = [
     "updated",
     "forked",
     "merged",
-    # sintetic actions derived from payload not explicitly labeled in the API:
     "pushed",
     "created",
     "deleted",
@@ -44,27 +43,27 @@ KNOWN_ACTIONS: list[str] = [
 
 
 class SilverEventsContract(pa.DataFrameModel):
-    """Fact table: one row per GitHub event (validated types and actions)."""
+    """Fact table: clean events with validated types, actions, and partition columns."""
 
-    id: str = pa.Field(nullable=False)
+    id: int = pa.Field(nullable=False, unique=True, ge=0)
     type: str = pa.Field(nullable=False, isin=KNOWN_EVENT_TYPES)
     action: str = pa.Field(nullable=False, isin=KNOWN_ACTIONS)
     actor_id: int = pa.Field(nullable=False, ge=0)
     repo_id: int = pa.Field(nullable=False, ge=0)
     org_id: int = pa.Field(nullable=True, ge=0)
     public: bool = pa.Field(nullable=False)
-    created_at: pl.Datetime = pa.Field(nullable=False)
+    created_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
     payload: str = pa.Field(nullable=False)
 
-    # partition columns (hive-style)
-    year: str = pa.Field(nullable=False, str_matches=r"^\d{4}$")  # YYYY
-    month: str = pa.Field(nullable=False, str_matches=r"^(0[1-9]|1[0-2])$")  # MM
-    day: str = pa.Field(nullable=False, str_matches=r"^(0[1-9]|[12]\d|3[01])$")  # DD
-    hour: str = pa.Field(nullable=False, str_matches=r"^(0\d|1\d|2[0-3])$")  # HH
+    # hive-style partition columns mirroring the bronze layout
+    year: str = pa.Field(nullable=False, str_matches=r"^\d{4}$")
+    month: str = pa.Field(nullable=False, str_matches=r"^(0[1-9]|1[0-2])$")
+    day: str = pa.Field(nullable=False, str_matches=r"^(0[1-9]|[12]\d|3[01])$")
+    hour: str = pa.Field(nullable=False, str_matches=r"^(0\d|1\d|2[0-3])$")
 
 
 class ActorsContract(pa.DataFrameModel):
-    """SCD Type 1 dimension: one unique row per GitHub actor."""
+    """SCD Type 1 dimension: GitHub users/actors, deduplicated by id."""
 
     id: int = pa.Field(nullable=False, unique=True, ge=0)
     login: str = pa.Field(nullable=False)
@@ -77,7 +76,7 @@ class ActorsContract(pa.DataFrameModel):
 
 
 class ReposContract(pa.DataFrameModel):
-    """SCD Type 1 dimension: one unique row per GitHub repository."""
+    """SCD Type 1 dimension: repositories, deduplicated by id."""
 
     id: int = pa.Field(nullable=False, unique=True, ge=0)
     name: str = pa.Field(nullable=False)
@@ -87,7 +86,7 @@ class ReposContract(pa.DataFrameModel):
 
 
 class OrgsContract(pa.DataFrameModel):
-    """SCD Type 1 dimension: one unique row per GitHub organization."""
+    """SCD Type 1 dimension: organizations, deduplicated by id."""
 
     id: int = pa.Field(nullable=False, unique=True, ge=0)
     login: str = pa.Field(nullable=False)
