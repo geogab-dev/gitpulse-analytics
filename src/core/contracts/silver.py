@@ -71,6 +71,7 @@ class ActorsContract(pa.DataFrameModel):
     gravatar_id: str = pa.Field(nullable=True)
     url: str = pa.Field(nullable=False)
     avatar_url: str = pa.Field(nullable=True)
+    is_bot: bool = pa.Field(nullable=False)
     first_seen_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
     updated_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
 

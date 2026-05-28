@@ -216,7 +216,10 @@ def _build_actors(df: DataFrame) -> DataFrame:
             _changed=(
                 pl.col("login").shift(1).over("id").is_not_null()
                 & (pl.col("login") != pl.col("login").shift(1).over("id"))
-            )
+            ),
+            # detect bots by login pattern: official [bot] suffix or common -bot ending
+            # covers both github-actions[bot] and dependabot[bot] as well as renovate-bot style
+            is_bot=pl.col("login").str.contains(r"\[bot\]|bot$"),
         )
         .group_by("id")
         .agg(
@@ -226,6 +229,8 @@ def _build_actors(df: DataFrame) -> DataFrame:
             pl.col("gravatar_id").last(),
             pl.col("url").last(),
             pl.col("avatar_url").last(),
+            # is_bot is a stable property  any() is safe (all values are same)
+            is_bot=pl.col("is_bot").any(),
             first_seen_at=pl.col("created_at").min(),
             # updated_at = timestamp of the change, or first_seen_at if unchanged
             updated_at=(
