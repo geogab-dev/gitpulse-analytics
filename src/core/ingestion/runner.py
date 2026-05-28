@@ -38,7 +38,10 @@ def run_ingestion(days: int, max_workers: int) -> None:
     total_hours_to_ingest: int = len(hours_to_ingest)
 
     logger.info(
-        f"Starting ingestion of {magenta(str(total_hours_to_ingest))} URLs with {magenta(str(max_workers))} workers"
+        "Starting ingestion: days=%s hours=%s workers=%s",
+        magenta(days),
+        magenta(total_hours_to_ingest),
+        magenta(max_workers),
     )
 
     progress, task_id = create_progress_bar(total=total_hours_to_ingest)
