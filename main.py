@@ -1,24 +1,32 @@
 """
-Entrypoint: serves all Prefect flows as deployments.
+Entrypoint: execute Prefect flows directly (no deployment).
 
 Usage:
-    uv run main.py                    # serve all flows
-    uv run main.py bronze             # serve only the bronze flow
+    uv run main.py           # execute bronze + silver (default)
+    uv run main.py bronze    # execute only bronze
+    uv run main.py silver    # execute only silver
 """
 
 import sys
 
 from pipelines.bronze_flow import bronze_ingestion_flow
+from pipelines.silver_flow import silver_transform_flow
 
 
 def serve_all() -> None:
-    """Serve all available flows for deployment."""
-    bronze_ingestion_flow.serve(name="bronze-ingestion-deployment")
+    """Execute both bronze and silver flows sequentially."""
+    bronze_ingestion_flow(days=1)
+    silver_transform_flow(batch_size=12)
 
 
 def serve_bronze() -> None:
-    """Serve only the bronze ingestion flow."""
-    bronze_ingestion_flow.serve(name="bronze-ingestion-deployment")
+    """Execute only the bronze ingestion flow."""
+    bronze_ingestion_flow(days=1)
+
+
+def serve_silver() -> None:
+    """Execute only the silver transformation flow."""
+    silver_transform_flow(batch_size=12)
 
 
 if __name__ == "__main__":
@@ -27,3 +35,7 @@ if __name__ == "__main__":
     match arg:
         case "bronze":
             serve_bronze()
+        case "silver":
+            serve_silver()
+        case _:
+            serve_all()
