@@ -13,7 +13,7 @@ def create_progress_bar(total: int) -> tuple[Progress, TaskID]:
     Build a rich progress bar to track ingestion workers.
     """
     progress = Progress(
-        SpinnerColumn(spinner_name="dots", style="bold green", speed=1.0),
+        SpinnerColumn(spinner_name="simpleDotsScrolling", style="bold green", speed=1.0),
         TextColumn("[magenta] {task.description}"),
         BarColumn(bar_width=100, style="dim", complete_style="green"),
         TextColumn("[bold green]{task.percentage:>6.1f}%"),
@@ -48,8 +48,18 @@ def run_ingestion(days: int, max_workers: int) -> None:
 
     def worker(hour: datetime) -> IngestResult:
         """Ingest a single hour and update the progress bar."""
-        result: IngestResult = ingest_hour(dt=hour)
         file_label: str = f"{hour.year}-{hour.month:02d}-{hour.day:02d}-{hour.hour:02d}.json.gz"
+
+        try:
+            result: IngestResult = ingest_hour(dt=hour)
+        except Exception as ex:
+            progress.console.log(
+                # log only the first 200 chars of the error for brevity
+                f"file [cyan]{file_label}[/cyan] [red]failed[/red]: {str(ex)[:100]}"
+            )
+            progress.update(task_id, advance=1, description=file_label)
+            return IngestResult.FAILED
+
         progress.update(task_id, advance=1, description=file_label)
         return result
 
@@ -76,7 +86,10 @@ def run_ingestion(days: int, max_workers: int) -> None:
             except Exception as exc:
                 # catch unexpected exceptions so a single worker failure
                 # doesn't crash the entire ingestion loop
-                logger.error("worker failed: %s", exc)
+                progress.console.log(
+                    f"worker [red]failed[/red] with unexpected exception: {str(exc)[:100]}"
+                )
+                progress.update(task_id, advance=1, description="error")
                 failed += 1
 
     logger.info(

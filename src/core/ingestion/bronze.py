@@ -7,7 +7,6 @@ from s3fs import S3FileSystem
 
 from core.config import settings
 from core.contracts.bronze import BRONZE_EVENTS_SCHEMA
-from core.helpers.logger import get_logger
 from core.helpers.s3 import S3_STORAGE_OPTIONS, get_s3_fs
 
 
@@ -41,14 +40,12 @@ def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
 
     Error handling:
         - 404 from GH Archive -> the hour hasn't been published yet -> SKIPPED (no retry).
-        - Any other OSError/Exception -> FAILED (logged for investigation).
+        - Any other OSError -> re-raised, caught by the worker in runner.py.
 
     Returns:
         IngestResult.SUCCESS — data ingested and written.
         IngestResult.SKIPPED — already in MinIO or not yet on GH Archive.
-        IngestResult.FAILED  — I/O error during download or write.
     """
-    logger = get_logger(__name__)
 
     # build URL from datetime components
     url: str = f"https://data.gharchive.org/{dt.year}-{dt.month:02d}-{dt.day:02d}-{dt.hour}.json.gz"
@@ -86,8 +83,4 @@ def ingest_hour(dt: datetime, overwrite: bool = False) -> IngestResult:
         # This is normal, hours near "now" are often delayed so we skip, not fail.
         if "404" in str(ex) or "Not Found" in str(ex):
             return IngestResult.SKIPPED
-        logger.error("failed to ingest %s: %s", url, ex)
-        return IngestResult.FAILED
-    except Exception as ex:
-        logger.error("failed to ingest %s: %s", url, ex)
-        return IngestResult.FAILED
+        raise
