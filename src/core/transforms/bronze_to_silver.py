@@ -4,18 +4,19 @@ Transform raw GitHub events from Bronze into Silver Delta tables.
 Reads partitioned Parquet from Bronze, parses JSON structs, extracts
 event actions, builds fact and dimension DataFrames, validates with
 Pandera contracts, then writes to Delta (append for events, SCD Type 1
-upsert for dimensions).
+anti-join + append for dimensions).
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
 import pandera.errors
 import polars as pl
 from deltalake.exceptions import DeltaError
-from polars import DataFrame, LazyFrame
+from polars import LazyFrame
 from s3fs import S3FileSystem
 
 from core.config import settings
@@ -26,7 +27,7 @@ from core.contracts.silver import (
     ReposContract,
     SilverEventsContract,
 )
-from core.helpers.delta import append_delta, upsert_delta
+from core.helpers.delta import append_delta, filter_scd1
 from core.helpers.logger import get_logger, magenta, yellow
 from core.helpers.s3 import S3_STORAGE_OPTIONS
 
@@ -173,11 +174,11 @@ def _extract_action(lf: LazyFrame) -> LazyFrame:
                 .then(pl.lit("deleted"))
             ),
         )
-        .drop("raw_action")
+        .drop("raw_action", "payload")
     )
 
 
-def _build_events(df: DataFrame) -> DataFrame:
+def _build_events(df: LazyFrame) -> LazyFrame:
     """Build the events fact table with hive partition columns."""
     return (
         df.select(
@@ -189,7 +190,6 @@ def _build_events(df: DataFrame) -> DataFrame:
             pl.col("org_struct").struct.field("id").alias("org_id"),
             pl.col("public"),
             pl.col("created_at"),
-            pl.col("payload"),
             # partition columns from created_at
             pl.col("created_at").dt.year().cast(pl.String).alias("year"),
             pl.col("created_at").dt.month().cast(pl.String).str.pad_start(2, "0").alias("month"),
@@ -201,107 +201,62 @@ def _build_events(df: DataFrame) -> DataFrame:
     )
 
 
-def _build_actors(df: DataFrame) -> DataFrame:
-    """Build actors dimension, deduplicated by id."""
+def _build_actors(df: LazyFrame) -> LazyFrame:
+    """Build actors dimension: one row per (id, login) version."""
     return (
         df.select(
             pl.col("actor_struct").struct.field("*"),
             pl.col("created_at"),
         )
         .drop_nulls(subset=["id"])
-        # sort so .last() and .shift() are deterministic
-        .sort("id", "created_at")
         .with_columns(
-            # true when login changes between consecutive events for the same actor
-            _changed=(
-                pl.col("login").shift(1).over("id").is_not_null()
-                & (pl.col("login") != pl.col("login").shift(1).over("id"))
-            ),
-            # detect bots by login pattern: official [bot] suffix or common -bot ending
-            # covers both github-actions[bot] and dependabot[bot] as well as renovate-bot style
             is_bot=pl.col("login").str.contains(r"\[bot\]|bot$"),
         )
-        .group_by("id")
+        .group_by("id", "login")
         .agg(
-            # .last() gives the most recent value for each field
-            pl.col("login").last(),
             pl.col("display_login").last(),
             pl.col("gravatar_id").last(),
             pl.col("url").last(),
             pl.col("avatar_url").last(),
-            # is_bot is a stable property  any() is safe (all values are same)
-            is_bot=pl.col("is_bot").any(),
+            pl.col("is_bot").any(),
             first_seen_at=pl.col("created_at").min(),
-            # updated_at = timestamp of the change, or first_seen_at if unchanged
-            updated_at=(
-                pl.when(pl.col("_changed").any())
-                .then(pl.col("created_at").filter(pl.col("_changed")).min())
-                .otherwise(pl.col("created_at").min())
-            ),
+            inserted_at=pl.lit(datetime.now(UTC).replace(tzinfo=None), dtype=pl.Datetime),
         )
     )
 
 
-def _build_repos(df: DataFrame) -> DataFrame:
-    """Build repos dimension, deduplicated by id."""
+def _build_repos(df: LazyFrame) -> LazyFrame:
+    """Build repos dimension: one row per (id, name) version."""
     return (
         df.select(
             pl.col("repo_struct").struct.field("*"),
             pl.col("created_at"),
         )
         .drop_nulls(subset=["id"])
-        .sort("id", "created_at")
-        .with_columns(
-            # true when repo name changes between consecutive events
-            _changed=(
-                pl.col("name").shift(1).over("id").is_not_null()
-                & (pl.col("name") != pl.col("name").shift(1).over("id"))
-            )
-        )
-        .group_by("id")
+        .group_by("id", "name")
         .agg(
-            # .last() gives the most recent value for name and url
-            pl.col("name").last(),
             pl.col("url").last(),
             first_seen_at=pl.col("created_at").min(),
-            updated_at=(
-                pl.when(pl.col("_changed").any())
-                .then(pl.col("created_at").filter(pl.col("_changed")).min())
-                .otherwise(pl.col("created_at").min())
-            ),
+            inserted_at=pl.lit(datetime.now(UTC).replace(tzinfo=None), dtype=pl.Datetime),
         )
     )
 
 
-def _build_orgs(df: DataFrame) -> DataFrame:
-    """Build orgs dimension, deduplicated by id."""
+def _build_orgs(df: LazyFrame) -> LazyFrame:
+    """Build orgs dimension: one row per (id, login) version."""
     return (
         df.select(
             pl.col("org_struct").struct.field("*"),
             pl.col("created_at"),
         )
         .drop_nulls(subset=["id"])
-        .sort("id", "created_at")
-        .with_columns(
-            # true when org login changes between consecutive events
-            _changed=(
-                pl.col("login").shift(1).over("id").is_not_null()
-                & (pl.col("login") != pl.col("login").shift(1).over("id"))
-            )
-        )
-        .group_by("id")
+        .group_by("id", "login")
         .agg(
-            # .last() gives the most recent value for each field
-            pl.col("login").last(),
             pl.col("gravatar_id").last(),
             pl.col("url").last(),
             pl.col("avatar_url").last(),
             first_seen_at=pl.col("created_at").min(),
-            updated_at=(
-                pl.when(pl.col("_changed").any())
-                .then(pl.col("created_at").filter(pl.col("_changed")).min())
-                .otherwise(pl.col("created_at").min())
-            ),
+            inserted_at=pl.lit(datetime.now(UTC).replace(tzinfo=None), dtype=pl.Datetime),
         )
     )
 
@@ -316,8 +271,10 @@ def transform_batch(batch_paths: list[str]) -> TransformResult:
         3. Parse: decode actor/repo/org JSON, parse timestamps
         4. Extract: parse or synthesize the ``action`` column
         5. Build: events fact + actors, repos, orgs dimensions
-        6. Validate: Pandera contracts before any write
-        7. Write: append events, upsert dims (SCD Type 1)
+        6. Filter: SCD Type 1 anti-join on dims (lazy, no materialize)
+        7. Collect: single ``pl.collect_all`` for all tables
+        8. Validate: Pandera contracts before any write
+        9. Write: append events + append filtered dimensions
     """
     logger = get_logger(__name__)
 
@@ -326,17 +283,47 @@ def transform_batch(batch_paths: list[str]) -> TransformResult:
         lf_events: LazyFrame = _read_bronze(batch_paths=batch_paths)
         lf_events: LazyFrame = _filter_events(lf=lf_events)
         lf_events: LazyFrame = _parse_structs(lf=lf_events)
-        lf_events: LazyFrame = _extract_action(lf=lf_events)
+        lf_events_parsed: LazyFrame = _extract_action(lf=lf_events)
 
-        # materialize once, then build tables: fact + dimension dataFrames
-        df_events_parsed: DataFrame = lf_events.collect().rechunk()
+        # build tables: fact + dimension dataFrames
+        lf_events: LazyFrame = _build_events(df=lf_events_parsed)
+        lf_actors: LazyFrame = _build_actors(df=lf_events_parsed)
+        lf_repos: LazyFrame = _build_repos(df=lf_events_parsed)
+        lf_orgs: LazyFrame = _build_orgs(df=lf_events_parsed)
 
-        df_events: DataFrame = _build_events(df=df_events_parsed)
-        df_actors: DataFrame = _build_actors(df=df_events_parsed)
-        df_repos: DataFrame = _build_repos(df=df_events_parsed)
-        df_orgs: DataFrame = _build_orgs(df=df_events_parsed)
+        # apply SCD Type 1 anti-join filter on dimensions (still lazy)
+        lf_actors = filter_scd1(
+            lf=lf_actors,
+            target=f"s3://{settings.minio.bucket_silver}/github/actors",
+            id_col="id",
+            track_col="login",
+        )
 
-        # events: write append
+        lf_repos = filter_scd1(
+            lf=lf_repos,
+            target=f"s3://{settings.minio.bucket_silver}/github/repos",
+            id_col="id",
+            track_col="name",
+        )
+
+        lf_orgs = filter_scd1(
+            lf=lf_orgs,
+            target=f"s3://{settings.minio.bucket_silver}/github/orgs",
+            id_col="id",
+            track_col="login",
+        )
+
+        # single collect: materialize once for validation + write
+        df_events, df_actors, df_repos, df_orgs = pl.collect_all(
+            [
+                lf_events,
+                lf_actors,
+                lf_repos,
+                lf_orgs,
+            ]
+        )
+
+        # fact events: write append
         if not df_events.is_empty():
             SilverEventsContract.validate(check_obj=df_events)
             append_delta(
@@ -345,35 +332,26 @@ def transform_batch(batch_paths: list[str]) -> TransformResult:
                 partition_by=["year", "month", "day", "hour"],
             )
 
-        # dimensions: SCD Type 1 upsert (insert new, update changed)
+        # dimensions: write append (already filtered by filter_scd1)
         if not df_actors.is_empty():
             ActorsContract.validate(check_obj=df_actors)
-            upsert_delta(
+            append_delta(
                 df=df_actors,
                 target=f"s3://{settings.minio.bucket_silver}/github/actors",
-                merge_predicate="target.id = source.id",
-                update_predicate="target.login != source.login",
-                insert_only_columns=["first_seen_at"],
             )
 
         if not df_repos.is_empty():
             ReposContract.validate(check_obj=df_repos)
-            upsert_delta(
+            append_delta(
                 df=df_repos,
                 target=f"s3://{settings.minio.bucket_silver}/github/repos",
-                merge_predicate="target.id = source.id",
-                update_predicate="target.name != source.name",
-                insert_only_columns=["first_seen_at"],
             )
 
         if not df_orgs.is_empty():
             OrgsContract.validate(check_obj=df_orgs)
-            upsert_delta(
+            append_delta(
                 df=df_orgs,
                 target=f"s3://{settings.minio.bucket_silver}/github/orgs",
-                merge_predicate="target.id = source.id",
-                update_predicate="target.login != source.login",
-                insert_only_columns=["first_seen_at"],
             )
 
         return TransformResult.SUCCESS

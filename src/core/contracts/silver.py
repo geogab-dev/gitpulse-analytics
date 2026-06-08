@@ -53,8 +53,6 @@ class SilverEventsContract(pa.DataFrameModel):
     org_id: int = pa.Field(nullable=True, ge=0)
     public: bool = pa.Field(nullable=False)
     created_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
-    payload: str = pa.Field(nullable=False)
-
     # hive-style partition columns mirroring the bronze layout
     year: str = pa.Field(nullable=False, str_matches=r"^\d{4}$")
     month: str = pa.Field(nullable=False, str_matches=r"^(0[1-9]|1[0-2])$")
@@ -63,9 +61,9 @@ class SilverEventsContract(pa.DataFrameModel):
 
 
 class ActorsContract(pa.DataFrameModel):
-    """SCD Type 1 dimension: GitHub users/actors, deduplicated by id."""
+    """SCD Type 1 dimension: GitHub users/actors, versioned by (id, login)."""
 
-    id: int = pa.Field(nullable=False, unique=True, ge=0)
+    id: int = pa.Field(nullable=False, ge=0)
     login: str = pa.Field(nullable=False)
     display_login: str = pa.Field(nullable=True)
     gravatar_id: str = pa.Field(nullable=True)
@@ -73,26 +71,26 @@ class ActorsContract(pa.DataFrameModel):
     avatar_url: str = pa.Field(nullable=True)
     is_bot: bool = pa.Field(nullable=False)
     first_seen_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
-    updated_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
+    inserted_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
 
 
 class ReposContract(pa.DataFrameModel):
-    """SCD Type 1 dimension: repositories, deduplicated by id."""
+    """SCD Type 1 dimension: repositories, versioned by (id, name)."""
 
-    id: int = pa.Field(nullable=False, unique=True, ge=0)
+    id: int = pa.Field(nullable=False, ge=0)
     name: str = pa.Field(nullable=False)
     url: str = pa.Field(nullable=False)
     first_seen_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
-    updated_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
+    inserted_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
 
 
 class OrgsContract(pa.DataFrameModel):
-    """SCD Type 1 dimension: organizations, deduplicated by id."""
+    """SCD Type 1 dimension: organizations, versioned by (id, login)."""
 
-    id: int = pa.Field(nullable=False, unique=True, ge=0)
+    id: int = pa.Field(nullable=False, ge=0)
     login: str = pa.Field(nullable=False)
     gravatar_id: str = pa.Field(nullable=True)
     url: str = pa.Field(nullable=False)
     avatar_url: str = pa.Field(nullable=True)
     first_seen_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
-    updated_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
+    inserted_at: DateTime = pa.Field(nullable=False, dtype_kwargs={"time_zone_agnostic": True})
