@@ -1,75 +1,16 @@
 """
-Delta Lake helpers: upsert (SCD Type 1) and append-only writes.
+Delta Lake helpers: append-only writes for facts and SCD Type 1 dimensions.
 """
 
 from __future__ import annotations
 
+import polars as pl
 from deltalake import DeltaTable, write_deltalake
 from deltalake.exceptions import TableNotFoundError
-from polars import DataFrame
+from polars import DataFrame, LazyFrame
 
 from core.helpers.logger import cyan, get_logger, magenta
 from core.helpers.s3 import S3_STORAGE_OPTIONS
-
-
-def upsert_delta(
-    df: DataFrame,
-    target: str,
-    merge_predicate: str,
-    update_predicate: str,
-    partition_by: list[str] | None = None,
-    insert_only_columns: list[str] | None = None,
-) -> None:
-    """
-    Upsert *df* into a Delta table (SCD Type 1), creating it if missing.
-
-    On first run the table is created via `write_deltalake(mode="overwrite")`.
-    Subsequent runs merge matched rows (when *update_predicate* is true) and
-    insert unmatched rows.
-
-    Columns listed in *insert_only_columns* (e.g. `first_seen_at`) are set
-    only on INSERT. On UPDATE the target (original) value is preserved.
-    """
-    logger = get_logger(__name__)
-
-    insert_only: set[str] = set(insert_only_columns or [])
-
-    try:
-        dt = DeltaTable(target, storage_options=S3_STORAGE_OPTIONS)
-    except TableNotFoundError:
-        write_deltalake(
-            target,
-            df.to_arrow(),
-            storage_options=S3_STORAGE_OPTIONS,
-            mode="overwrite",
-            partition_by=partition_by or [],
-        )
-
-        logger.info("created %s rows into %s (new table)", magenta(len(df)), cyan(target))
-        return
-
-    # build update mapping: source columns overwrite target, insert-only preserved
-    update_updates: dict[str, str] = {
-        col: f"source.{col}"
-        for col in df.columns
-        if col not in insert_only and col not in (partition_by or [])
-    }
-    for col in insert_only:
-        update_updates[col] = f"target.{col}"
-
-    (
-        dt.merge(
-            source=df.to_arrow(),
-            predicate=merge_predicate,
-            source_alias="source",
-            target_alias="target",
-        )
-        .when_matched_update(predicate=update_predicate, updates=update_updates)
-        .when_not_matched_insert_all()
-        .execute()
-    )
-
-    logger.info("merged %s rows into %s", magenta(len(df)), cyan(target))
 
 
 def append_delta(
@@ -96,4 +37,34 @@ def append_delta(
     logger.info("appended %s rows into %s", magenta(len(df)), cyan(target))
 
 
-__all__: list[str] = ["upsert_delta", "append_delta"]
+def filter_scd1(
+    lf: LazyFrame,
+    target: str,
+    id_col: str,
+    track_col: str,
+) -> LazyFrame:
+    """
+    Filter a LazyFrame to only new/changed rows for SCD Type 1 upsert.
+
+    Anti-joins on `(id_col, track_col)` against the existing Delta table.
+    If the table doesn't exist yet (first run), returns the original
+    LazyFrame unchanged, meaning all rows are new.
+
+    This function is purely lazy, no data is materialized. The caller
+    should chain this before a single `.collect()` along with validation.
+    """
+    try:
+        DeltaTable(target, storage_options=S3_STORAGE_OPTIONS)
+    except TableNotFoundError:
+        # first run: table doesn't exist yet, all rows are new
+        return lf
+
+    # truly lazy scan, only the 2 columns needed for the anti-join
+    existing: LazyFrame = pl.scan_delta(target, storage_options=S3_STORAGE_OPTIONS).select(
+        id_col, track_col
+    )
+
+    return lf.join(existing, on=[id_col, track_col], how="anti")
+
+
+__all__: list[str] = ["append_delta", "filter_scd1"]
