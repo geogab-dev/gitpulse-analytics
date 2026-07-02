@@ -1,7 +1,8 @@
 .PHONY: \
 	help up down restart logs ps reset \
 	install \
-	format lint typecheck rmcache
+	format lint typecheck rmcache \
+	pipeline dashboard
 
 help:
 	@echo
@@ -23,6 +24,10 @@ help:
 	@echo "   make lint:      Check code with ruff"
 	@echo "   make typecheck: Check types with pyrefly"
 	@echo "   make rmcache:   Remove __pycache__ and .ruff_cache directories"
+	@echo ""
+	@echo "[PIPELINE]"
+	@echo "   make pipeline:  Run the full ETL pipeline (bronze + silver + gold)"
+	@echo "   make dashboard: Launch the Streamlit dashboard"
 	@echo
 
 up:
@@ -57,6 +62,12 @@ lint:
 
 typecheck:
 	uv run pyrefly check .
+
+pipeline:
+	uv run python main.py
+
+dashboard:
+	uv run streamlit run dashboard/app.py
 
 rmcache:
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

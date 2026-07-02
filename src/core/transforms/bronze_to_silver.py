@@ -376,7 +376,7 @@ def transform_batch(batch_paths: list[str]) -> TransformResult:
 
     except Exception:
         logger.exception("unexpected error in batch: %s", batch_paths)
-        return TransformResult.FAILED
+        raise
 
 
 __all__: list[str] = ["resolve_pending_partitions", "transform_batch"]

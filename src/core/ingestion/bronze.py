@@ -18,13 +18,14 @@ class IngestResult(StrEnum):
 
 def generate_hourly_datetimes(days: int) -> list[datetime]:
     """
-    Generate hourly datetime objects for the past N days, going back from the last complete hour.
+    Generate hourly datetime objects for the past N complete days, starting from hour 0.
 
     Skips the current (incomplete) hour to avoid racing against GH Archive publication.
     For example, at 14:23 UTC, the last complete hour is 13:00 UTC.
+    The range covers from ``00:00`` of ``days`` days ago up to that last complete hour.
     """
     now: datetime = datetime.now(UTC) - timedelta(hours=1)
-    start: datetime = now.replace(minute=0, second=0, microsecond=0) - timedelta(days=days)
+    start: datetime = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days)
     hours: int = int((now - start).total_seconds() // 3600) + 1
     return [start + timedelta(hours=i) for i in range(hours)]
 
