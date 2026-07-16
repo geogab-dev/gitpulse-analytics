@@ -1,0 +1,71 @@
+[[theme.fontFaces]]
+family = "Inter"
+url = "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2"
+style = "normal"
+weight = "400"
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuI6fAZ9hiJ-Ek-_EeA.woff2"
+style = "normal"
+weight = "500"
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYAZ9hiJ-Ek-_EeA.woff2"
+style = "normal"
+weight = "600"
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuBWYAZ9hiJ-Ek-_EeA.woff2"
+style = "normal"
+weight = "700"
+
+[[theme.fontFaces]]
+family = "JetBrains Mono"
+url = "https://fonts.gstatic.com/s/jetbrainsmono/v20/lJtbYoFdCw0Pp0oH6gT2hUmK7yI4.woff2"
+style = "normal"
+weight = "400"
+
+[[theme.fontFaces]]
+family = "JetBrains Mono"
+url = "https://fonts.gstatic.com/s/jetbrainsmono/v20/lJtbYoFdCw0Pp0oH6gT2hAmK7yI4.woff2"
+style = "normal"
+weight = "700"
+
+[theme]
+base = "dark"
+
+# Accent: GitHub inspired blue, high contrast against dark surfaces
+primaryColor = "#58A6FF"
+
+# Backgrounds: deep navy-black, easy on the eyes
+backgroundColor = "#0D1117"
+secondaryBackgroundColor = "#161B22"
+codeBackgroundColor = "#151B23"
+
+# Text: warm off-white, safe contrast ratio
+textColor = "#E6EDF3"
+linkColor = "#58A6FF"
+
+# Borders: subtle separation without visual noise
+borderColor = "#30363D"
+showWidgetBorder = true
+showSidebarBorder = true
+
+# Corners: subtle rounding, modern feel
+baseRadius = "0.5rem"
+
+# Fonts: Inter for body/headings, JetBrains Mono for code
+font = "Inter, sans-serif"
+headingFont = "Inter, sans-serif"
+codeFont = "'JetBrains Mono', monospace"
+
+# Sidebar theme
+[theme.sidebar]
+backgroundColor = "#0D1117"
+secondaryBackgroundColor = "#161B22"
+primaryColor = "#58A6FF"
+textColor = "#E6EDF3"
+borderColor = "#30363D"
