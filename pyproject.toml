@@ -16,6 +16,8 @@ dependencies = [
     "prefect>=3.6.29",
     "rich>=15.0.0",
     "s3fs>=2026.4.0",
+    "streamlit>=1.58.0",
+    "streamlit-echarts>=0.7.0",
 ]
 
 [dependency-groups]
@@ -23,7 +25,7 @@ dev = [
     "itables>=2.7.3",
     "pandas>=3.0.3",
     "pyarrow>=24.0.0",
-    "pyrefly>=0.64.1",
+    "ty>=0.0.59",
     "ruff>=0.15.12",
 ]
 
@@ -74,16 +76,18 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
-# type checking settings for pyrefly
-[tool.pyrefly]
-project-includes = [
-    "src/**/*.py",
-    "tests/**/*.py",
+# type checking settings for ty
+[tool.ty]
+[tool.ty.src]
+include = [
+    "src",
+    "tests",
 ]
-project-excludes = [
-    ".venv/**",
-    "build/**",
-    "dist/**",
+exclude = [
+    ".venv",
+    "build",
+    "dist",
 ]
-search-path = ["src"]
+
+[tool.ty.environment]
 python-version = "3.12"

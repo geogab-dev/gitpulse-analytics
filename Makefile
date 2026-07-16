@@ -2,7 +2,7 @@
 	help up down restart logs ps reset \
 	install \
 	format lint typecheck rmcache \
-	pipeline dashboard
+	pipeline export-data dashboard
 
 help:
 	@echo
@@ -22,12 +22,13 @@ help:
 	@echo "[DEVELOPMENT]"
 	@echo "   make format:    Format code with ruff"
 	@echo "   make lint:      Check code with ruff"
-	@echo "   make typecheck: Check types with pyrefly"
+	@echo "   make typecheck: Check types with ty"
 	@echo "   make rmcache:   Remove __pycache__ and .ruff_cache directories"
 	@echo ""
 	@echo "[PIPELINE]"
-	@echo "   make pipeline:  Run the full ETL pipeline (bronze + silver + gold)"
-	@echo "   make dashboard: Launch the Streamlit dashboard"
+	@echo "   make pipeline:    Run the full ETL pipeline (bronze + silver + gold)"
+	@echo "   make export-data: Export MinIO data to static Parquet for dashboard"
+	@echo "   make dashboard:   Launch the Streamlit dashboard"
 	@echo
 
 up:
@@ -61,10 +62,13 @@ lint:
 	uv run ruff check .
 
 typecheck:
-	uv run pyrefly check .
+	uv run ty check .
 
 pipeline:
 	uv run python main.py
+
+export-data:
+	uv run python scripts/export_dashboard_data.py
 
 dashboard:
 	uv run streamlit run dashboard/app.py
