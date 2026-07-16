@@ -44,10 +44,23 @@ class PrefectSettings(BaseSettings):
     server_ui_api_url: str
 
 
+class DashboardSettings(BaseSettings):
+    # dashboard settings
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+        **COMMON_CONFIG, env_prefix="DASHBOARD_"
+    )
+
+    data_source: str = "static"  # default to public dashboard
+    title: str = "GitPulse Analytics"
+    cache_ttl: int = 3600
+    static_data_path: str = "dashboard/data"
+
+
 class Settings(BaseSettings):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     minio: MinioSettings = Field(default_factory=MinioSettings)
     prefect: PrefectSettings = Field(default_factory=PrefectSettings)
+    dashboard: DashboardSettings = Field(default_factory=DashboardSettings)
 
 
 settings = Settings()
